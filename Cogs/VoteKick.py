@@ -24,6 +24,9 @@ class VoteKick(commands.Cog):
 		self.check_time = 10
 		self.muter = muter
 		self.loop_list = []
+		global Utils, DisplayName
+		Utils = self.bot.get_cog("Utils")
+		DisplayName = self.bot.get_cog("DisplayName")
 
 	# Proof of concept stuff for reloading cog/extension
 	def _is_submodule(self, parent, child):
@@ -701,7 +704,7 @@ class VoteKick(commands.Cog):
 					# Cooldown is higher as is - ignore
 					continue
 				# We need to mute				
-				await self.muter.mute(member, ctx.message.guild, time.time() + mute_time)
+				await self.muter._mute(member, ctx.message.guild, time.time() + mute_time)
 				user["Muted"] = True
 				await ctx.send("*{}* has been muted for {}.".format(DisplayName.name(member), ReadableTime.getReadableTimeBetween(0, mute_time)))
 			# Check for mention

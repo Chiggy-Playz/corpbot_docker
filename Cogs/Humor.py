@@ -14,6 +14,9 @@ class Humor(commands.Cog):
 
 	def __init__(self, bot, settings, listName = "Adjectives.txt"):
 		self.bot = bot
+		global Utils, DisplayName
+		Utils = self.bot.get_cog("Utils")
+		DisplayName = self.bot.get_cog("DisplayName")
 		self.settings = settings
 		# Setup our adjective list
 		self.adj = []
@@ -43,7 +46,22 @@ class Humor(commands.Cog):
 			"truffle",
 			"fish",
 			"snail",
-			"frozen tear"
+			"frozen tear",
+			"chicken statue",
+			"bone flute",
+			"pufferfish",
+			"Joja Cola",
+			"trash",
+			"egg",
+			"crispy bass",
+			"fish taco",
+			"cookie",
+			"garlic",
+			"weeds",
+			"honey",
+			"gizmo",
+			"cloth",
+			"geode"
 			]
 		self.stardew_responses = [
 			"I'm just here for my annual check-up! Don't worry, I'm not preg... I mean, I'm not sick! Heh.",
@@ -65,7 +83,22 @@ class Humor(commands.Cog):
 			"Sometimes I stop and realize that I'm nothing more than a bag of juicy, squishy flesh.",
 			"Ah... an Fish Taco! Thanks.",
 			"No u.",
-			"Thanks... I hate it."
+			"Thanks... I hate it.",
+			"I really should scrub my floorboards today. I think an algae is starting to form.",
+			"That was some way to ring in the new year last night...",
+			"You scared me, sneaking into my room like that!",
+			"So there you have it. You probably figured I hated this chair.",
+			"This... Are you trying to hurt me even more?",
+			"I thought we had something special... I guess I was wrong.",
+			"This... They gave this to me in Gotoro prison camp. I've been trying to forget about that. *shudder*",
+			"If I stay perfectly still, perhaps a resplendent butterfly will bless my nose with a landing.",
+			"My basket! Thank you. This means a lot to me.",
+			"But... You don't need to try and 'help' me... I know best how to live my own life... okay?",
+			"This is a great gift. Thank you!",
+			"Oh, a birthday gift! Thank you.",
+			"All my customers... Here?!?",
+			"Grr... sounds like these raccoons are back again. Filthy varmints...",
+			"Sometimes I look for crawdads in the river. Don't tell Aunt Marnie... but I fed one to a cow once."
 		]
 					
 	@commands.command(pass_context=True)
@@ -317,6 +350,9 @@ class Humor(commands.Cog):
 	async def stardew(self, ctx, *, user = None):
 		"""Test your luck with another user."""
 
+		# Set some defaults
+		name_max_w = 92
+		name_max_h = 15
 		if not self.canDisplay(ctx.guild):
 			return
 		# Let's check if the "url" is actually a user
@@ -332,7 +368,7 @@ class Humor(commands.Cog):
 		image = self.s_image.copy()
 		if not image.width == 319 or not image.height == 111:
 			image = image.resize((319,111),resample=PIL.Image.LANCZOS)
-		message = await ctx.send("Gifting {} to {}...".format(random.choice(self.stardew_gifts),Nullify.clean(DisplayName.name(test_user))))
+		message = await ctx.send("Gifting *{}* to {}...".format(random.choice(self.stardew_gifts),Nullify.clean(DisplayName.name(test_user))))
 		path = await GetImage.download(user)
 		if not path:
 			return await message.edit(content="I guess I couldn't gift that...  Make sure you're passing a valid user.")
@@ -347,26 +383,23 @@ class Humor(commands.Cog):
 			# Write the user's name in the name box - starts at (209,99)
 			d = ImageDraw.Draw(image)
 			name_text = DisplayName.name(test_user)
-			name_size = 15
-			while True:
+			name_size = name_max_h # max size for the name to fit
+			t_w,t_h = d.textsize(name_text,font=ImageFont.truetype("fonts/stardew.ttf",name_size))
+			if t_w > name_max_w:
+				name_size = int(t_h*(name_max_w/t_w))
 				t_w,t_h = d.textsize(name_text,font=ImageFont.truetype("fonts/stardew.ttf",name_size))
-				if t_w > 92:
-					# Too big, scale down
-					name_size -= 1
-				else:
-					break
 			d.text((210+(88-t_w)/2,88+(12-t_h)/2),DisplayName.name(test_user),font=ImageFont.truetype("fonts/stardew.ttf",name_size),fill=(86,22,12))
 			# Get the response - origin is (10,10), each row height is 14
 			rows = textwrap.wrap(
 				random.choice(self.stardew_responses),
 				30,
 				break_long_words=True,
-            	replace_whitespace=False
+				replace_whitespace=False
 				)
 			for index,row in enumerate(rows[:6]):
 				d.text((11+2,10+14*index),row,font=ImageFont.truetype("fonts/stardew.ttf",15),fill=(86,22,12))
 			# Resize to triple and save
-			image = image.resize((319*3,111*3))
+			image = image.resize((319*3,111*3),PIL.Image.NEAREST)
 			image.save('images/Stardewnow.png')
 			await ctx.send(file=discord.File(fp='images/Stardewnow.png'))
 			await message.delete(delay=2)

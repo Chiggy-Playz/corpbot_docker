@@ -3,15 +3,18 @@ from   discord.ext import commands
 from   Cogs        import Nullify, DisplayName, UserTime, Message, PickList
 
 def setup(bot):
-	# Add the bot and deps
-	settings = bot.get_cog("Settings")
-	bot.add_cog(ServerStats(bot, settings))
+    # Add the bot and deps
+    settings = bot.get_cog("Settings")
+    bot.add_cog(ServerStats(bot, settings))
 
 class ServerStats(commands.Cog):
 
     def __init__(self, bot, settings):
         self.bot = bot
         self.settings = settings
+        global Utils, DisplayName
+        Utils = self.bot.get_cog("Utils")
+        DisplayName = self.bot.get_cog("DisplayName")
 
     async def message(self, message):
         # Check the message and see if we should allow it - always yes.
@@ -128,7 +131,8 @@ class ServerStats(commands.Cog):
         server_embed.add_field(name="Voice Region", value=guild.region, inline=True)
         server_embed.add_field(name="Considered Large", value=guild.large, inline=True)
         server_embed.add_field(name="Shard ID", value="{}/{}".format(guild.shard_id+1, self.bot.shard_count), inline=True)
-	    # Find out where in our join position this server is
+        server_embed.add_field(name="Nitro Boosts",value="{} (level {})".format(guild.premium_subscription_count,guild.premium_tier))
+        # Find out where in our join position this server is
         joinedList = []
         popList    = []
         for g in self.bot.guilds:
@@ -136,7 +140,7 @@ class ServerStats(commands.Cog):
             popList.append({ 'ID' : g.id, 'Population' : len(g.members) })
         
         # sort the guilds by join date
-        joinedList = sorted(joinedList, key=lambda x:x['Joined'])
+        joinedList = sorted(joinedList, key=lambda x:x["Joined"].timestamp() if x["Joined"] != None else -1)
         popList = sorted(popList, key=lambda x:x['Population'], reverse=True)
         
         check_item = { "ID" : guild.id, "Joined" : guild.me.joined_at }
@@ -151,40 +155,46 @@ class ServerStats(commands.Cog):
         server_embed.add_field(name="Population Rank", value="{:,} of {:,}".format(position, total), inline=True)
         
         emojitext = ""
-        emojicount = 0
-        for emoji in guild.emojis:
-            if emoji.animated:
-                emojiMention = "<a:"+emoji.name+":"+str(emoji.id)+">"
-            else:
-                emojiMention = "<:"+emoji.name+":"+str(emoji.id)+">"
+        emojifields = []
+        disabledemojis = 0
+        twitchemojis = 0
+        for i,emoji in enumerate(guild.emojis):
+            if not emoji.available:
+                disabledemojis += 1
+                continue
+            if emoji.managed:
+                twitchemojis += 1
+                continue
+            emojiMention = "<{}:{}:{}>".format("a" if emoji.animated else "",emoji.name,emoji.id)
             test = emojitext + emojiMention
             if len(test) > 1024:
                 # TOOO BIIIIIIIIG
-                emojicount += 1
-                if emojicount == 1:
-                    ename = "Emojis ({:,} total)".format(len(guild.emojis))
-                else:
-                    ename = "Emojis (Continued)"
-                server_embed.add_field(name=ename, value=emojitext, inline=True)
+                emojifields.append(emojitext)
                 emojitext=emojiMention
             else:
                 emojitext = emojitext + emojiMention
+        
+        if len(emojitext): emojifields.append(emojitext) # Add any leftovers
+        if twitchemojis:   emojifields.append("{:,} managed".format(twitchemojis))
+        if disabledemojis: emojifields.append("{:,} unavailable".format(disabledemojis)) # Add the disabled if any
 
-        if len(emojitext):
-            if emojicount == 0:
-                emojiname = "Emojis ({} total)".format(len(guild.emojis))
-            else:
-                emojiname = "Emojis (Continued)"
-            server_embed.add_field(name=emojiname, value=emojitext, inline=True)
-
-
-        if len(guild.icon_url):
-            server_embed.set_thumbnail(url=guild.icon_url)
-        else:
-            # No Icon
-            server_embed.set_thumbnail(url=ctx.author.default_avatar_url)
+        server_embed.set_thumbnail(url=guild.icon_url if len(guild.icon_url) else ctx.author.default_avatar_url)
         server_embed.set_footer(text="Server ID: {}".format(guild.id))
-        await ctx.channel.send(embed=server_embed)
+        # Let's send all the embeds we need finishing off with extra emojis as needed
+        for i,e in enumerate(emojifields):
+            name = "Disabled Emojis" if e.lower().endswith("unavailable") else "Twitch Emojis" if e.lower().endswith("managed") else "Emojis ({} of {})".format(i+1,len(emojifields))
+            server_embed.add_field(name=name,value=e,inline=True)
+            if len(server_embed) > 6000: # too big
+                server_embed.remove_field(len(server_embed.fields)-1)
+                await ctx.send(embed=server_embed)
+                server_embed = discord.Embed(color=ctx.author.color)
+                server_embed.title = guild.name
+                server_embed.set_thumbnail(url=guild.icon_url if len(guild.icon_url) else ctx.author.default_avatar_url)
+                server_embed.set_footer(text="Server ID: {}".format(guild.id))
+                server_embed.description = "Continued Emojis:"
+                server_embed.add_field(name=name,value=e,inline=True)
+        if len(server_embed.fields):
+            await ctx.send(embed=server_embed)
 
 
     @commands.command()
@@ -306,7 +316,7 @@ class ServerStats(commands.Cog):
                 ), "inline" : False}
             ],
             color=ctx.message.author).edit(ctx, message)
-	
+    
     @commands.command()
     async def joinpos(self, ctx, *, member = None):
         """Tells when a user joined compared to other users."""
@@ -334,7 +344,7 @@ class ServerStats(commands.Cog):
             joinedList.append({ 'ID' : mem.id, 'Joined' : mem.joined_at })
         
         # sort the users by join date
-        joinedList = sorted(joinedList, key=lambda x:x['Joined'])
+        joinedList = sorted(joinedList, key=lambda x:x["Joined"].timestamp() if x["Joined"] != None else -1)
 
         check_item = { "ID" : member.id, "Joined" : member.joined_at }
 
@@ -377,7 +387,7 @@ class ServerStats(commands.Cog):
             return await ctx.send("Position must be an int between 1 and {:,}".format(len(ctx.guild.members)))
         joinedList = [{"member":mem,"joined":mem.joined_at} for mem in ctx.guild.members]
         # sort the users by join date
-        joinedList = sorted(joinedList, key=lambda x:x['joined'])
+        joinedList = sorted(joinedList, key=lambda x:x["joined"].timestamp() if x["joined"] != None else -1)
         join = joinedList[position]
         msg = "*{}* joined at position **{:,}**.".format(DisplayName.name(join["member"]),position+1)
         await ctx.send(msg)
@@ -391,11 +401,11 @@ class ServerStats(commands.Cog):
             our_list.append(
                 {
                     "name":DisplayName.name(member),
-                    "value":"{} UTC".format(member.joined_at.strftime("%Y-%m-%d %I:%M %p")),#UserTime.getUserTime(ctx.author,self.settings,member.joined_at,force=offset)["vanity"],
+                    "value":"{} UTC".format(member.joined_at.strftime("%Y-%m-%d %I:%M %p") if member.joined_at != None else "Unknown"),#UserTime.getUserTime(ctx.author,self.settings,member.joined_at,force=offset)["vanity"],
                     "date":member.joined_at
                 }
             )
-        our_list = sorted(our_list, key=lambda x:x["date"])
+        our_list = sorted(our_list, key=lambda x:x["date"].timestamp() if x["date"] != None else -1)
         return await PickList.PagePicker(title="First Members to Join {} ({:,} total)".format(ctx.guild.name,len(ctx.guild.members)),ctx=ctx,list=[{"name":"{}. {}".format(y+1,x["name"]),"value":x["value"]} for y,x in enumerate(our_list)]).pick()
 
     @commands.command()
@@ -407,11 +417,11 @@ class ServerStats(commands.Cog):
             our_list.append(
                 {
                     "name":DisplayName.name(member),
-                    "value":"{} UTC".format(member.joined_at.strftime("%Y-%m-%d %I:%M %p")),#UserTime.getUserTime(ctx.author,self.settings,member.joined_at,force=offset)["vanity"],
+                    "value":"{} UTC".format(member.joined_at.strftime("%Y-%m-%d %I:%M %p") if member.joined_at != None else "Unknown"),#UserTime.getUserTime(ctx.author,self.settings,member.joined_at,force=offset)["vanity"],
                     "date":member.joined_at
                 }
             )
-        our_list = sorted(our_list, key=lambda x:x["date"],reverse=True)
+        our_list = sorted(our_list, key=lambda x:x["date"].timestamp() if x["date"] != None else -1)
         return await PickList.PagePicker(title="Most Recent Members to Join {} ({:,} total)".format(ctx.guild.name,len(ctx.guild.members)),ctx=ctx,list=[{"name":"{}. {}".format(y+1,x["name"]),"value":x["value"]} for y,x in enumerate(our_list)]).pick()
         
     @commands.command()
@@ -424,11 +434,11 @@ class ServerStats(commands.Cog):
             our_list.append(
                 {
                     "name":"{} ({:,} member{})".format(guild.name,len(guild.members),"" if len(guild.members)==1 else "s"),
-                    "value":"{} UTC".format(bot.joined_at.strftime("%Y-%m-%d %I:%M %p")),#UserTime.getUserTime(ctx.author,self.settings,bot.joined_at,force=offset)["vanity"],
+                    "value":"{} UTC".format(bot.joined_at.strftime("%Y-%m-%d %I:%M %p") if bot.joined_at != None else "Unknown"),#UserTime.getUserTime(ctx.author,self.settings,bot.joined_at,force=offset)["vanity"],
                     "date":bot.joined_at
                 }
             )
-        our_list = sorted(our_list, key=lambda x:x["date"])
+        our_list = sorted(our_list, key=lambda x:x["date"].timestamp() if x["date"] != None else -1)
         return await PickList.PagePicker(title="First Servers I Joined ({:,} total)".format(len(self.bot.guilds)),ctx=ctx,list=[{"name":"{}. {}".format(y+1,x["name"]),"value":x["value"]} for y,x in enumerate(our_list)]).pick()
 
     @commands.command()
@@ -441,11 +451,11 @@ class ServerStats(commands.Cog):
             our_list.append(
                 {
                     "name":"{} ({} member{})".format(guild.name,len(guild.members),"" if len(guild.members)==1 else "s"),
-                    "value":"{} UTC".format(bot.joined_at.strftime("%Y-%m-%d %I:%M %p")),#UserTime.getUserTime(ctx.author,self.settings,bot.joined_at,force=offset)["vanity"],
+                    "value":"{} UTC".format(bot.joined_at.strftime("%Y-%m-%d %I:%M %p") if bot.joined_at != None else "Unknown"),#UserTime.getUserTime(ctx.author,self.settings,bot.joined_at,force=offset)["vanity"],
                     "date":bot.joined_at
                 }
             )
-        our_list = sorted(our_list, key=lambda x:x["date"],reverse=True)
+        our_list = sorted(our_list, key=lambda x:x["date"].timestamp() if x["date"] != None else -1)
         return await PickList.PagePicker(title="Most Recent Servers I Joined ({:,} total)".format(len(self.bot.guilds)),ctx=ctx,list=[{"name":"{}. {}".format(y+1,x["name"]),"value":x["value"]} for y,x in enumerate(our_list)]).pick()
 
     @commands.command()

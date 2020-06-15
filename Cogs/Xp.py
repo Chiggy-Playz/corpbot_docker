@@ -25,6 +25,9 @@ class Xp(commands.Cog):
 		self.bot = bot
 		self.settings = settings
 		self.is_current = False # Used for stopping loops
+		global Utils, DisplayName
+		Utils = self.bot.get_cog("Utils")
+		DisplayName = self.bot.get_cog("DisplayName")
 
 	def _can_xp(self, user, server, requiredXP = None, promoArray = None):
 		# Checks whether or not said user has access to the xp system
@@ -982,17 +985,14 @@ class Xp(commands.Cog):
 			# Add to embed
 			stat_embed.set_author(name='{}'.format(member.name))
 		# Get localized user time
-		local_time = UserTime.getUserTime(ctx.author, self.settings, member.joined_at)
-		j_time_str = "{} {}".format(local_time['time'], local_time['zone'])
+		if member.joined_at != None:
+			local_time = UserTime.getUserTime(ctx.author, self.settings, member.joined_at)
+			j_time_str = "{} {}".format(local_time['time'], local_time['zone'])
 		
-		msg = "{}**Joined:** *{}*\n".format(msg, j_time_str) # I think this will work
-		msg = "{}**XP:** *{:,}*\n".format(msg, newStat)
-		msg = "{}**XP Reserve:** *{:,}*\n".format(msg, newState)
-		
-		# Add Joined
-		stat_embed.add_field(name="Joined", value=j_time_str, inline=True)
-
-		# msg = '*{}* has *{} xp*, and can gift up to *{} xp!*'.format(DisplayName.name(member), newStat, newState)
+			# Add Joined
+			stat_embed.add_field(name="Joined", value=j_time_str, inline=True)
+		else:
+			stat_embed.add_field(name="Joined", value="Unknown", inline=True)
 
 		# Get user's current role
 		promoArray = self.settings.getServerStat(ctx.message.guild, "PromotionArray")
@@ -1019,7 +1019,6 @@ class Xp(commands.Cog):
 						# There's more roles above this
 						nRoleIndex = promoSorted.index(role)+1
 						nextRole = promoSorted[nRoleIndex]
-
 
 		if highestRole:
 			msg = '{}**Current Rank:** *{}*\n'.format(msg, highestRole)
@@ -1055,6 +1054,10 @@ class Xp(commands.Cog):
 
 		stat_embed.add_field(name="ID", value=str(member.id), inline=True)
 		stat_embed.add_field(name="User Name", value="{}#{}".format(member.name, member.discriminator), inline=True)
+		if member.premium_since:
+			local_time = UserTime.getUserTime(ctx.author, self.settings, member.premium_since, clock=True)
+			c_time_str = "{} {}".format(local_time['time'], local_time['zone'])
+			stat_embed.add_field(name="Boosting Since",value=c_time_str)
 		
 		if member.activity and member.activity.name:
 			# Playing a game!
@@ -1068,17 +1071,15 @@ class Xp(commands.Cog):
 				# Add the URL too
 				stat_embed.add_field(name="Stream URL", value="[Watch Now]({})".format(member.activity.url), inline=True)
 		# Add joinpos
-		joinedList = []
-		for mem in ctx.message.guild.members:
-			joinedList.append({ 'ID' : mem.id, 'Joined' : mem.joined_at })
-		
-		# sort the users by join date
-		joinedList = sorted(joinedList, key=lambda x:x['Joined'])
-		check_item = { "ID" : member.id, "Joined" : member.joined_at }
-		total = len(joinedList)
-		position = joinedList.index(check_item) + 1
-		
-		stat_embed.add_field(name="Join Position", value="{:,} of {:,}".format(position, total), inline=True)
+		joinedList = sorted([{"ID":mem.id,"Joined":mem.joined_at} for mem in ctx.guild.members], key=lambda x:x["Joined"].timestamp() if x["Joined"] != None else -1)
+
+		if member.joined_at != None:
+			check_item = { "ID" : member.id, "Joined" : member.joined_at }
+			total = len(joinedList)
+			position = joinedList.index(check_item) + 1
+			stat_embed.add_field(name="Join Position", value="{:,} of {:,}".format(position, total), inline=True)
+		else:
+			stat_embed.add_field(name="Join Position", value="Unknown", inline=True)
 		
 		# Get localized user time
 		local_time = UserTime.getUserTime(ctx.author, self.settings, member.created_at, clock=False)

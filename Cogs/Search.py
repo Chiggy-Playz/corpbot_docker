@@ -5,31 +5,31 @@ from   Cogs import Settings, DisplayName, TinyURL, Message, DL
 
 def setup(bot):
 	# Add the bot and deps
-	auth = "corpSiteAuth.txt"
-	bot.add_cog(Search(bot, auth))
+	bot.add_cog(Search(bot))
 
 class Search(commands.Cog):
 
 	# Init with the bot reference
 	def __init__(self, bot, auth_file: str = None):
-		self.bot = bot
-		self.site_auth = None
-		if os.path.isfile(auth_file):
-		        with open(auth_file, 'r') as f:
-		                self.site_auth = f.read()
-		self.key = "3a337666060f628a0a91"
+		self.bot       = bot
+		self.site_auth = bot.settings_dict.get("corpsiteauth",None)
+		self.key       = bot.settings_dict.get("currency","")
+		global Utils, DisplayName
+		Utils = self.bot.get_cog("Utils")
+		DisplayName = self.bot.get_cog("DisplayName")
 
 	def quote(self, query):
 		# Strips all spaces, tabs, returns and replaces with + signs, then urllib quotes
-		return quote(query.replace("+","%2B").replace("\t","+").replace("\r","+").replace("\n","+").replace(" ","+"))
+		return quote(query.replace("+","%2B").replace("\t","+").replace("\r","+").replace("\n","+").replace(" ","+"),safe="+")
 
 	async def get_search(self, ctx, query, service=""):
 		# Searches in the passed service
 		service = "s={}&".format(service) if service else ""
 		lmgtfy = "http://lmgtfy.com/?{}q={}".format(service, self.quote(query))
 		try:
-			lmgtfyT = await TinyURL.tiny_url(lmgtfy)
-		except:
+			lmgtfyT = await TinyURL.tiny_url(lmgtfy, self.bot)
+		except Exception as e:
+			print(e)
 			msg = "It looks like I couldn't search for that... :("
 		else:
 			msg = '*{}*, you can find your answers here:\n\n<{}>'.format(DisplayName.name(ctx.message.author), lmgtfyT)
@@ -187,9 +187,9 @@ class Search(commands.Cog):
 		last = None
 		conv = []
 		for val in vals:
-			if all(x in "0123456789." for x in val) and num is None:
+			if all(x in "+-0123456789." for x in val if not x == ",") and num is None:
 				# Got a number
-				try: num = float(val)
+				try: num = float(val.replace(",",""))
 				except: pass # Not a valid number
 			elif val.lower() in ["from","to"]:
 				last = True if val.lower() == "to" else False
@@ -198,9 +198,10 @@ class Search(commands.Cog):
 				conv.append([last,val])
 				if len(conv) >= 2: break # We have enough values
 				last = None
-		if num is None or len(conv) < 2:
+		if num is None: num = 1
+		if len(conv) < 2:
 			return await ctx.send("Usage: `{}convert [amount] [from_currency] (to) [to_currency]` - Type `{}convert` for a list of valid currencies.".format(ctx.prefix,ctx.prefix))
-		if num <= 0:
+		if num == 0:
 			return await ctx.send("Anything times 0 is 0, silly.")
 		# Normalize our to/from prioritizing the end arg
 		conv[0][0] = False if conv[1][0] == True else True if conv[1][0] == False else conv[0][0] if conv[0][0] != None else False # wut

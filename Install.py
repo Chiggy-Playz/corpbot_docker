@@ -103,7 +103,7 @@ class Run:
             args   = comm.get("args",   [])
             shell  = comm.get("shell",  False)
             stream = comm.get("stream", False)
-            sudo   = comm.get("sudo -H",   False)
+            sudo   = comm.get("sudo",   False)
             stdout = comm.get("stdout", False)
             stderr = comm.get("stderr", False)
             mess   = comm.get("message", None)
@@ -154,7 +154,8 @@ if __name__ == '__main__':
     modules = [
         {"name":"discord [rewrite]", "item":"discord.py[voice]"},
         {"name":"pillow"},
-        {"name":"youtube-dl"},
+        # {"name":"youtube-dl"},
+        {"name":"Wavelink"},
         {"name":"Requests"},
         {"name":"parsedatetime"},
         {"name":"psutil"},
@@ -175,7 +176,7 @@ if __name__ == '__main__':
     for module in modules:
         item+=1
         print("\n\nUpdating {} - {} of {}\n\n".format(module["name"], item, len(modules)))
-        r.run({"args":[sys.executable, "-m", "pip", "install", "--user", "-U", module.get("item", module["name"])], "stream":True})
+        r.run({"args":[sys.executable, "-m", "pip", "install", "-U", module.get("item", module["name"])], "stream":True})
     # Prompt for the users to press enter to exit
     prompt = "Done.\n\nPress [enter] to leave the script..."
     if sys.version_info >= (3, 0):

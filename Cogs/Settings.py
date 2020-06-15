@@ -153,6 +153,9 @@ class Settings(commands.Cog):
 		self.prefix = prefix
 		self.loop_list = []
 		self.role = RoleManager(bot)
+		global Utils, DisplayName
+		Utils = self.bot.get_cog("Utils")
+		DisplayName = self.bot.get_cog("DisplayName")
 
 		self.defaultServer = { 						# Negates Name and ID - those are added dynamically to each new server
 				"DefaultRole" 			: "", 		# Auto-assigned role position
@@ -208,7 +211,7 @@ class Settings(commands.Cog):
 				"AdminUnlimited" 		: True,		# Do admins have unlimited xp to give?
 				"BotAdminAsAdmin" 		: False,	# Do bot-admins count as admins with xp?
 				"RemindOffline"			: False,	# Let users know when they ping offline members
-				"JoinPM"				: True,		# Do we pm new users with rules?
+				"JoinPM"				: False,	# Do we pm new users with rules?
 				"XPPromote" 			: True,		# Can xp raise your rank?
 				"XPDemote" 				: False,	# Can xp lower your rank?
 				"SuppressPromotions"	: False,	# Do we suppress the promotion message?
@@ -361,7 +364,13 @@ class Settings(commands.Cog):
 
 	async def onjoin(self, member, server):
 		# Welcome - and initialize timers
-		self.bot.loop.create_task(self.giveRole(member, server))
+		try:
+			vt = time.time() + int(self.getServerStat(server,"VerificationTime",0)) * 60
+		except:
+			vt = 0
+		self.setUserStat(member,server,"VerificationTime",vt)
+		if not member.bot:
+			self.bot.loop.create_task(self.giveRole(member, server))
 
 	# Proof of concept stuff for reloading cog/extension
 	def _is_submodule(self, parent, child):
@@ -405,6 +414,9 @@ class Settings(commands.Cog):
 			if defRole:
 				# We have a default - check for it
 				for member in server.members:
+					if member.bot:
+						# skip bots
+						continue
 					foundRole = False
 					for role in member.roles:
 						if role == defRole:
@@ -698,6 +710,8 @@ class Settings(commands.Cog):
 
 
 	def checkGlobalUsers(self):
+		# Just return from this method - may be erroneously dropping users' settings
+		return 0
 		# This whole method should be reworked to not require
 		# a couple loops to remove users - but since it's not
 		# something that's run all the time, it's probably not
@@ -1242,7 +1256,7 @@ class Settings(commands.Cog):
 			for key in removeKeys:
 				self.serverDict["Servers"][str(server.id)].pop(key, None)
 
-		if removedSettings is 1:
+		if removedSettings == 1:
 			settingsWord = "setting"
 		
 		await message.edit(content="Flushing settings to disk...", embed=None)
@@ -1362,7 +1376,7 @@ class Settings(commands.Cog):
 			for key in removeKeys:
 				self.serverDict["Servers"][serv].pop(key, None)
 
-		if removedSettings is 1:
+		if removedSettings == 1:
 			settingsWord = "setting"
 
 		await message.edit(content="Flushing settings to disk...")

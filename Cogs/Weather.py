@@ -1,13 +1,7 @@
-import asyncio
-import discord
-import datetime
+import asyncio, discord, datetime, re
 from geopy.geocoders import Nominatim
-import re
 from   discord.ext import commands
-from   Cogs import Message
-from   Cogs import PickList
-from   Cogs import Nullify
-from   Cogs import DL
+from   Cogs import Message, PickList, Nullify, DL
 
 def setup(bot):
 	# Add the bot
@@ -19,7 +13,7 @@ class Weather(commands.Cog):
 	# Init with the bot reference, and a reference to the settings var
 	def __init__(self, bot):
 		self.bot = bot
-		self.key = "412efff445b9e3ba1f1e80b083b6b3d4"
+		self.key = bot.settings_dict.get("weather","")
 		self.geo = Nominatim(user_agent="CorpBot")
 
 	def _get_output(self, w_text):
@@ -118,7 +112,7 @@ class Weather(commands.Cog):
 			pass
 		await ctx.send(output)
 
-	def get_weather_text(self, r = {}, state_average = False):
+	def get_weather_text(self, r = {}, show_current = True):
 		# Returns a string representing the weather passed
 		main    = r["main"]
 		weath   = r["weather"]
@@ -138,9 +132,9 @@ class Weather(commands.Cog):
 			weath_list.append(self._get_output(d))
 		condition = ", ".join(weath_list)
 		# Format the description
-		desc = "{} °F ({} °C){},\n\n{},\n\nHigh of {} °F ({} °C) - Low of {} °F ({} °C)\n\n".format(
-			tf, tc,
-			" average" if state_average else "",
+		if show_current: desc = "{} °F ({} °C),\n\n".format(tf,tc)
+		else: desc = ""
+		desc += "{}\n\nHigh of {} °F ({} °C) - Low of {} °F ({} °C)\n\n".format(
 			condition,
 			maxf, maxc,
 			minf, minc
@@ -223,7 +217,7 @@ class Weather(commands.Cog):
 			days[day]["main"]["temp"]/=days[day]["day_count"]
 			fields.append({
 				"name":datetime.datetime.strptime(day,"%Y-%m-%d").strftime("%A, %b %d, %Y")+":",
-				"value":self.get_weather_text(days[day], True),
+				"value":self.get_weather_text(days[day], False),
 				"inline":False
 			})
 		# Now we send our embed!
